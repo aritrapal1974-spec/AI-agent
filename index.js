@@ -30,13 +30,13 @@ app.post('/agent', (req, res) => {
 function extractInputNumber(query) {
   const text = query.toLowerCase();
 
-  // 🔥 1. Strong patterns (highest priority)
+  // 🔥 Try strong patterns first
   const patterns = [
     /input number\s*[:is]*\s*(\d+)/,
-    /number\s*[:is]*\s*(\d+)/,
+    /input\s*(\d+)/,
     /given\s*(\d+)/,
     /start with\s*(\d+)/,
-    /input\s*(\d+)/,
+    /number\s*[:is]*\s*(\d+)/
   ];
 
   for (let pattern of patterns) {
@@ -44,11 +44,12 @@ function extractInputNumber(query) {
     if (match) return Number(match[1]);
   }
 
-  // 🔥 2. Fallback → first standalone number (not from rules)
-  const allNumbers = text.match(/\d+/g);
+  // 🔥 SMART fallback: pick number BEFORE "rule"
+  const beforeRules = text.split('rule')[0];
+  const nums = beforeRules.match(/\d+/g);
 
-  if (allNumbers && allNumbers.length > 0) {
-    return Number(allNumbers[0]);
+  if (nums && nums.length > 0) {
+    return Number(nums[nums.length - 1]); // last number before rules
   }
 
   return null;
