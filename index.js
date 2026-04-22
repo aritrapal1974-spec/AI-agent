@@ -33,35 +33,29 @@ app.post('/agent', (req, res) => {
  * RULE ENGINE
  * =====================================
  */
+
 function applyRules(query) {
-  // 🔥 extract number safely
-  const match = query.match(/-?\d+/);
-  if (!match) return "0";
+  // 🔥 extract ALL numbers safely
+  const nums = query.match(/-?\d+/g);
 
-  let num = parseInt(match[0], 10);
+  if (!nums || nums.length === 0) return "FIZZ"; // 🔥 safe fallback
 
-  // 🔥 Rule 1
-  if (num % 2 === 0) {
-    num = num * 2;
-  } else {
-    num = num + 10;
-  }
+  // take FIRST meaningful number
+  let num = Number(nums[0]);
 
-  // 🔥 Rule 2
-  if (num > 20) {
-    num = num - 5;
-  } else {
-    num = num + 3;
-  }
+  // Rule 1
+  num = (num % 2 === 0) ? num * 2 : num + 10;
 
-  // 🔥 Rule 3
+  // Rule 2
+  num = (num > 20) ? num - 5 : num + 3;
+
+  // Rule 3
   if (num % 3 === 0) {
     return "FIZZ";
   }
 
   return String(num);
 }
-
 /**
  * =====================================
  * START SERVER
