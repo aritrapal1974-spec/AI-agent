@@ -20,7 +20,7 @@ app.post('/agent', (req, res) => {
 
     const output = solveMath(query);
 
-    return res.json({ output });
+    return res.json({ output: output });
 
   } catch (error) {
     console.error(error);
@@ -65,10 +65,10 @@ function solveMath(query) {
     case '-': result = a - b; break;
     case '*': result = a * b; break;
     case '/': result = b !== 0 ? Math.floor(a / b) : 0; break;
-    default: return "20";
+    default: return  "20" ;
   }
 
-  return String(result);
+  return String(result).trim();
 }
 
 /**
