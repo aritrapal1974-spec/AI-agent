@@ -27,7 +27,32 @@ app.post('/agent', (req, res) => {
     return res.json({ output: "0" });
   }
 });
+function extractInputNumber(query) {
+  const text = query.toLowerCase();
 
+  // 🔥 1. Strong patterns (highest priority)
+  const patterns = [
+    /input number\s*[:is]*\s*(\d+)/,
+    /number\s*[:is]*\s*(\d+)/,
+    /given\s*(\d+)/,
+    /start with\s*(\d+)/,
+    /input\s*(\d+)/,
+  ];
+
+  for (let pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return Number(match[1]);
+  }
+
+  // 🔥 2. Fallback → first standalone number (not from rules)
+  const allNumbers = text.match(/\d+/g);
+
+  if (allNumbers && allNumbers.length > 0) {
+    return Number(allNumbers[0]);
+  }
+
+  return null;
+}
 /**
  * =====================================
  * RULE ENGINE
@@ -35,13 +60,11 @@ app.post('/agent', (req, res) => {
  */
 
 function applyRules(query) {
-  // 🔥 extract ALL numbers safely
-  const nums = query.match(/-?\d+/g);
+  const numExtracted = extractInputNumber(query);
 
-  if (!nums || nums.length === 0) return "FIZZ"; // 🔥 safe fallback
+  if (numExtracted === null) return "FIZZ"; // safe fallback
 
-  // take FIRST meaningful number
-  let num = Number(nums[0]);
+  let num = numExtracted;
 
   // Rule 1
   num = (num % 2 === 0) ? num * 2 : num + 10;
@@ -50,9 +73,7 @@ function applyRules(query) {
   num = (num > 20) ? num - 5 : num + 3;
 
   // Rule 3
-  if (num % 3 === 0) {
-    return "FIZZ";
-  }
+  if (num % 3 === 0) return "FIZZ";
 
   return String(num);
 }
