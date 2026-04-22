@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1",
-    "mathjs": "^15.2.0"
+    "mathjs": "^15.2.0",
+    "openai": "^6.34.0"
   }
 }
