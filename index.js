@@ -49,6 +49,13 @@ function calculateExpression(query) {
 
   const result = safeEvaluate(expression);
 
+if (result.error) return result.error;
+
+// 🔥 detect operation from ORIGINAL query (not expression)
+const operation = detectOperationFromQuery(query);
+
+return formatResult(result.value, operation);
+
   if (result.error) return result.error;
 
   return formatResult(result.value, result.operation);
@@ -150,6 +157,30 @@ function detectOperation(expr) {
   if (expr.includes('/')) return 'quotient';
   if (expr.includes('%')) return 'remainder';
   if (expr.includes('^')) return 'power';
+  return 'result';
+}
+function detectOperationFromQuery(query) {
+  const q = query.toLowerCase();
+
+  if (q.includes('add') || q.includes('plus') || q.includes('+') || q.includes('sum')) {
+    return 'sum';
+  }
+  if (q.includes('subtract') || q.includes('minus') || q.includes('-') || q.includes('difference')) {
+    return 'difference';
+  }
+  if (q.includes('multiply') || q.includes('times') || q.includes('*') || q.includes('product')) {
+    return 'product';
+  }
+  if (q.includes('divide') || q.includes('divided') || q.includes('/') || q.includes('quotient')) {
+    return 'quotient';
+  }
+  if (q.includes('%') || q.includes('mod')) {
+    return 'remainder';
+  }
+  if (q.includes('power') || q.includes('^')) {
+    return 'power';
+  }
+
   return 'result';
 }
 
