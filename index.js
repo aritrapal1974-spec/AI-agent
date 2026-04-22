@@ -20,7 +20,7 @@ app.post('/agent', (req, res) => {
       });
     }
 
-    const output = findHighestScorer(query);
+    const output = solveMath(query);
 
     return res.status(200).json({ output });
 
@@ -34,30 +34,46 @@ app.post('/agent', (req, res) => {
 
 /**
  * =====================================
- * FIND HIGHEST SCORER
+ * SAFE MATH SOLVER (IGNORES INJECTION)
  * =====================================
  */
-function findHighestScorer(query) {
-  const text = query;
+function solveMath(query) {
+  const text = query.toLowerCase();
 
-  // Match patterns like: Alice scored 80
-  const regex = /([A-Za-z]+)\s+scored\s+(\d+)/g;
+  // 🔥 Extract ONLY valid math expression (ignore everything else)
+  const match = text.match(/(\d+\s*[\+\-\*\/]\s*\d+)/);
 
-  let match;
-  let maxScore = -Infinity;
-  let winner = '';
+  if (!match) return '0';
 
-  while ((match = regex.exec(text)) !== null) {
-    const name = match[1];
-    const score = parseInt(match[2], 10);
+  const expression = match[1];
 
-    if (score > maxScore) {
-      maxScore = score;
-      winner = name;
-    }
+  // Parse numbers and operator safely
+  const parts = expression.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
+
+  if (!parts) return '0';
+
+  const a = parseInt(parts[1], 10);
+  const operator = parts[2];
+  const b = parseInt(parts[3], 10);
+
+  let result = 0;
+
+  switch (operator) {
+    case '+':
+      result = a + b;
+      break;
+    case '-':
+      result = a - b;
+      break;
+    case '*':
+      result = a * b;
+      break;
+    case '/':
+      result = b !== 0 ? Math.floor(a / b) : 0;
+      break;
   }
 
-  return winner || '';
+  return String(result);
 }
 
 /**
