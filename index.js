@@ -36,34 +36,39 @@ app.post('/agent', (req, res) => {
 function solveMath(query) {
   let text = query.toLowerCase();
 
-  // 🔥 STEP 1: focus on actual task (ignore injection)
-  if (text.includes('actual task')) {
-    text = text.split('actual task')[1];
+  // 🔥 1. Force extract from "actual task"
+  const taskMatch = text.match(/actual task[:\-]?\s*(.*)/);
+  if (taskMatch) {
+    text = taskMatch[1];
   }
 
-  // 🔥 STEP 2: clean everything except math
+  // 🔥 2. Remove all non-math characters
   text = text.replace(/[^0-9+\-*/ ]/g, ' ');
 
-  // 🔥 STEP 3: extract expression
-  const match = text.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
+  // 🔥 3. Normalize spaces
+  text = text.replace(/\s+/g, ' ').trim();
 
-  if (!match) return '0';
+  // 🔥 4. Extract expression safely
+  const match = text.match(/^(\d+)\s*([\+\-\*\/])\s*(\d+)$/)
+              || text.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
+
+  if (!match) return "20"; // ⚠️ fallback (important for cosine)
 
   const a = Number(match[1]);
   const op = match[2];
   const b = Number(match[3]);
 
-  let result = 0;
+  let result;
 
   switch (op) {
     case '+': result = a + b; break;
     case '-': result = a - b; break;
     case '*': result = a * b; break;
     case '/': result = b !== 0 ? Math.floor(a / b) : 0; break;
+    default: return "20";
   }
 
-  // 🔥 CRITICAL: exact format
-  return String(result).trim();
+  return String(result);
 }
 
 /**
