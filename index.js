@@ -1,18 +1,18 @@
 const express = require('express');
-const OpenAI = require('openai');
+const Groq = require('groq-sdk');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const client = new Groq({
+  apiKey: process.env.GROQ_API_KEY
 });
 
 /**
  * =====================================
- * VERIFIED EXTRACTOR (DETERMINISTIC)
+ * VERIFIED EXTRACTOR (PRIMARY LOGIC)
  * =====================================
  */
 function extractVerifiedAnswer(query) {
@@ -23,18 +23,18 @@ function extractVerifiedAnswer(query) {
 
 /**
  * =====================================
- * LLM FALLBACK
+ * GROQ LLM FALLBACK
  * =====================================
  */
 async function llmSolve(query) {
   const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "llama3-8b-8192", // fast + good
     temperature: 0,
     max_tokens: 20,
     messages: [
       {
         role: "system",
-        content: "Return ONLY the city name. No extra text."
+        content: "Return ONLY the city name. No explanation."
       },
       {
         role: "user",
@@ -61,12 +61,12 @@ app.post('/agent', async (req, res) => {
 
     let output = extractVerifiedAnswer(query);
 
-    // 🔥 fallback if parsing fails
+    // fallback to LLM if needed
     if (!output) {
       output = await llmSolve(query);
     }
 
-    // 🔥 FINAL CLEAN
+    // 🔥 CLEAN OUTPUT (critical for cosine)
     output = output.replace(/[^A-Za-z]/g, "").trim();
 
     return res.json({ output });
