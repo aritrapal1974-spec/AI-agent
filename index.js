@@ -98,16 +98,31 @@ function calculateExpression(query) {
  * @returns {string|null} - Mathematical expression
  */
 function convertNaturalLanguageToMath(query) {
+
+  
   // Remove filler words
   let cleaned = query
+  .replace(/add (\d+(?:\.\d+)?) and (\d+(?:\.\d+)?)/gi, '$1 + $2')
+.replace(/sum of (\d+(?:\.\d+)?) and (\d+(?:\.\d+)?)/gi, '$1 + $2')
+
+.replace(/subtract (\d+(?:\.\d+)?) from (\d+(?:\.\d+)?)/gi, '$2 - $1')
+.replace(/difference between (\d+(?:\.\d+)?) and (\d+(?:\.\d+)?)/gi, '$1 - $2')
+
+.replace(/multiply (\d+(?:\.\d+)?) (by|with) (\d+(?:\.\d+)?)/gi, '$1 * $3')
+
+.replace(/divide (\d+(?:\.\d+)?) by (\d+(?:\.\d+)?)/gi, '$1 / $2')
+.replace(/quotient of (\d+(?:\.\d+)?) and (\d+(?:\.\d+)?)/gi, '$1 / $2')
     .replace(/\bwhat\s+is\b/g, '')
     .replace(/\bcalculate\b/g, '')
     .replace(/\bfind\b/g, '')
+    .replace(/\bthe\b/g, '')
+    .replace(/\bof\b/g, '')
+.replace(/\band\b/g, ' ')
     .replace(/\bplease\b/g, '')
     .replace(/\bcompute\b/g, '')
     .replace(/\b\?\s*$/g, '') // Remove trailing question mark
     .trim();
-
+  
   // Handle structured phrases: "product of A and B", "sum of A and B", etc.
   const structuredPatterns = [
     { pattern: /product\s+of\s+([\d.]+)\s+and\s+([\d.]+)/gi, operator: '*', name: 'product' },
@@ -148,6 +163,32 @@ function convertNaturalLanguageToMath(query) {
 
   return expression;
 }
+const math = require('mathjs');
+
+function safeEvaluate(expression) {
+  try {
+    const value = math.evaluate(expression);
+
+    if (!isFinite(value)) {
+      return { error: 'Cannot divide by zero.', value: null, operation: null };
+    }
+
+    const operation = detectOperation(expression);
+
+    return {
+      value,
+      operation,
+      error: null
+    };
+
+  } catch (error) {
+    return {
+      error: 'Invalid expression.',
+      value: null,
+      operation: null
+    };
+  }
+}
 
 /**
  * Safely evaluate mathematical expressions without using eval()
@@ -155,32 +196,7 @@ function convertNaturalLanguageToMath(query) {
  * 
  * @param {string} expression - Mathematical expression (e.g., "10 + 5 * 2")
  * @returns {object} - { value: number, operation: string, error: null } or { error: string, value: null, operation: null }
- */
-function safeEvaluate(expression) {
-  // Sanitize: remove spaces and ensure valid characters only
-  const sanitized = expression.replace(/\s+/g, '');
 
-  // Validate: only numbers, operators, and parentheses allowed
-  if (!/^[-]?[\d.+\-*/%^()]+$/.test(sanitized)) {
-    return { error: 'Invalid expression.', value: null, operation: null };
-  }
-
-  try {
-    // Parse and evaluate with proper order of operations
-    const result = evaluateExpression(sanitized);
-
-    if (isNaN(result)) {
-      return { error: 'Invalid expression.', value: null, operation: null };
-    }
-
-    // Determine operation type from expression
-    const operation = detectOperation(sanitized);
-
-    return { value: result, operation, error: null };
-  } catch (error) {
-    return { error: 'Cannot divide by zero.', value: null, operation: null };
-  }
-}
 
 /**
  * Evaluate mathematical expression with proper order of operations
@@ -189,39 +205,10 @@ function safeEvaluate(expression) {
  * @param {string} expr - Sanitized expression
  * @returns {number} - Result
  */
-function evaluateExpression(expr) {
-  // Handle exponentiation (highest priority)
-  expr = expr.replace(/(-?\d+\.?\d*)\^(-?\d+\.?\d*)/g, (match, base, exp) => {
-    return Math.pow(parseFloat(base), parseFloat(exp));
-  });
 
-  // Handle multiplication, division, modulo (medium priority)
-  expr = expr.replace(/(-?\d+\.?\d*)([*/%])(-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
-  const a = parseFloat(num1);
-    const b = parseFloat(num2);
-
-    if (operator === '*') return a * b;
-    if (operator === '/') {
-      if (b === 0) throw new Error('Division by zero');
-      return a / b;
-    }
-    if (operator === '%') {
-      if (b === 0) throw new Error('Division by zero');
-      return a % b;
-    }
-  });
 
   // Handle addition, subtraction (lowest priority)
-  expr = expr.replace(/(-?\d+\.?\d*)([+-])(-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
-  const a = parseFloat(num1);
-    const b = parseFloat(num2);
-
-    if (operator === '+') return a + b;
-    if (operator === '-') return a - b;
-  });
-
-  return parseFloat(expr);
-}
+  
 
 /**
  * Detect the primary operation in an expression
@@ -229,38 +216,21 @@ function evaluateExpression(expr) {
  * @returns {string} - Operation name
  */
 function detectOperation(expr) {
-  // Check in order of lowest to highest precedence (since we evaluate those last)
-  if (/[+]/.test(expr) && !expr.match(/^-/)) return 'sum';
-  if (/-(?!^\-)/.test(expr)) return 'difference';
-  if (/\*/.test(expr)) return 'product';
-  if (/\//.test(expr)) return 'quotient';
-  if (/%/.test(expr)) return 'remainder';
-  if (/\^/.test(expr)) return 'power';
+  if (expr.includes('+')) return 'sum';
+  if (expr.includes('-')) return 'difference';
+  if (expr.includes('*')) return 'product';
+  if (expr.includes('/')) return 'quotient';
+  if (expr.includes('%')) return 'remainder';
+  if (expr.includes('^')) return 'power';
   return 'result';
 }
-
 /**
  * Format calculation result into natural language
  * @param {number} value - Calculated result
  * @param {string} operation - Type of operation
  * @returns {string} - Formatted response
  */
-function formatResult(value, operation) {
-  // Format number: remove unnecessary decimals
-  const formatted = Number.isInteger(value) ? value : parseFloat(value.toFixed(2));
 
-  const operationNames = {
-    'sum': 'sum',
-    'difference': 'difference',
-    'product': 'product',
-    'quotient': 'quotient',
-    'remainder': 'remainder',
-    'power': 'power'
-  };
-
-  const opName = operationNames[operation] || 'result';
-  return `The ${opName} is ${formatted}.`;
-}
 
 /**
  * Health check endpoint
