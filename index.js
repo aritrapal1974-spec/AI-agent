@@ -196,8 +196,8 @@ function evaluateExpression(expr) {
   });
 
   // Handle multiplication, division, modulo (medium priority)
-  expr = expr.replace(/(-?\d+\.?\d*)[*/%](-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
-    const a = parseFloat(num1);
+  expr = expr.replace(/(-?\d+\.?\d*)([*/%])(-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
+  const a = parseFloat(num1);
     const b = parseFloat(num2);
 
     if (operator === '*') return a * b;
@@ -212,8 +212,8 @@ function evaluateExpression(expr) {
   });
 
   // Handle addition, subtraction (lowest priority)
-  expr = expr.replace(/(-?\d+\.?\d*)[+-](-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
-    const a = parseFloat(num1);
+  expr = expr.replace(/(-?\d+\.?\d*)([+-])(-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
+  const a = parseFloat(num1);
     const b = parseFloat(num2);
 
     if (operator === '+') return a + b;
