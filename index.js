@@ -30,36 +30,22 @@ app.post('/agent', (req, res) => {
 function extractInputNumber(query) {
   const text = query.toLowerCase();
 
-  // 🔥 Try structured patterns first
-  const patterns = [
-    /input number\s*[:is]*\s*(\d+)/,
-    /number\s*[:is]*\s*(\d+)/,
-    /given\s*(\d+)/,
-    /start with\s*(\d+)/,
-    /take\s*(\d+)/,
-    /(\d+)\s*(is the input)/,
-  ];
+  // get all numbers
+  const nums = text.match(/\d+/g);
+  if (!nums) return null;
 
-  for (let pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return Number(match[1]);
+  // convert to numbers
+  const numbers = nums.map(Number);
+
+  // 🔥 remove common rule numbers
+  const filtered = numbers.filter(n => ![1, 2, 3, 5, 10, 20].includes(n));
+
+  if (filtered.length > 0) {
+    return filtered[0]; // first valid non-rule number
   }
 
-  // 🔥 SMART fallback: get number BEFORE rules start
-  const beforeRules = text.split(/rule\s*1/i)[0];
-  const nums = beforeRules.match(/\d+/g);
-
-  if (nums && nums.length > 0) {
-    return Number(nums[nums.length - 1]); // last number before rules
-  }
-
-  // 🔥 FINAL fallback: ANY number
-  const allNums = text.match(/\d+/g);
-  if (allNums && allNums.length > 0) {
-    return Number(allNums[0]);
-  }
-
-  return null;
+  // fallback → first number
+  return numbers[0];
 }
 /**
  * =====================================
