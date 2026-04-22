@@ -38,36 +38,36 @@ app.post('/agent', (req, res) => {
  * =====================================
  */
 function solveMath(query) {
-  // 🔥 Extract ONLY valid math expression
-  const match = query.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
+  // 🔥 Extract part AFTER "actual task"
+  let clean = query.toLowerCase();
+
+  if (clean.includes('actual task')) {
+    clean = clean.split('actual task')[1];
+  }
+
+  // remove noise
+  clean = clean.replace(/[^0-9+\-*/ ]/g, ' ');
+
+  // extract math expression
+  const match = clean.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
 
   if (!match) return '0';
 
   const a = parseInt(match[1], 10);
-  const operator = match[2];
+  const op = match[2];
   const b = parseInt(match[3], 10);
 
-  let result = 0;
+  let result;
 
-  switch (operator) {
-    case '+':
-      result = a + b;
-      break;
-    case '-':
-      result = a - b;
-      break;
-    case '*':
-      result = a * b;
-      break;
-    case '/':
-      result = b !== 0 ? Math.floor(a / b) : 0;
-      break;
+  switch (op) {
+    case '+': result = a + b; break;
+    case '-': result = a - b; break;
+    case '*': result = a * b; break;
+    case '/': result = b !== 0 ? Math.floor(a / b) : 0; break;
   }
-
-  // 🔥 CRITICAL: return ONLY number string
+  return String(result).trim();
   return String(result);
 }
-
 /**
  * =====================================
  * HEALTH CHECK
