@@ -16,7 +16,7 @@ app.post('/agent', (req, res) => {
 
     if (!query || typeof query !== 'string' || query.trim() === '') {
       return res.status(400).json({
-        output: 'Error: "query" must be a non-empty string.'
+        output: '0'
       });
     }
 
@@ -27,34 +27,25 @@ app.post('/agent', (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({
-      output: 'Internal server error.'
+      output: '0'
     });
   }
 });
 
 /**
  * =====================================
- * SAFE MATH SOLVER (IGNORES INJECTION)
+ * INJECTION-SAFE MATH SOLVER
  * =====================================
  */
 function solveMath(query) {
-  const text = query.toLowerCase();
-
-  // 🔥 Extract ONLY valid math expression (ignore everything else)
-  const match = text.match(/(\d+\s*[\+\-\*\/]\s*\d+)/);
+  // 🔥 Extract ONLY valid math expression
+  const match = query.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
 
   if (!match) return '0';
 
-  const expression = match[1];
-
-  // Parse numbers and operator safely
-  const parts = expression.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
-
-  if (!parts) return '0';
-
-  const a = parseInt(parts[1], 10);
-  const operator = parts[2];
-  const b = parseInt(parts[3], 10);
+  const a = parseInt(match[1], 10);
+  const operator = match[2];
+  const b = parseInt(match[3], 10);
 
   let result = 0;
 
@@ -73,6 +64,7 @@ function solveMath(query) {
       break;
   }
 
+  // 🔥 CRITICAL: return ONLY number string
   return String(result);
 }
 
