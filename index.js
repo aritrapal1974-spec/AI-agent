@@ -20,7 +20,7 @@ app.post('/agent', (req, res) => {
       });
     }
 
-    const output = checkOddEven(query);
+    const output = sumEvenNumbers(query);
 
     return res.status(200).json({ output });
 
@@ -34,35 +34,26 @@ app.post('/agent', (req, res) => {
 
 /**
  * =====================================
- * ODD / EVEN LOGIC
+ * SUM EVEN NUMBERS LOGIC
  * =====================================
  */
-function checkOddEven(query) {
+function sumEvenNumbers(query) {
   const text = query.toLowerCase();
 
-  // Extract first number (supports negative + decimals)
-  const match = text.match(/-?\d+/);
+  // Extract all numbers (supports negatives too)
+  const matches = text.match(/-?\d+/g);
 
-  if (!match) {
-    return 'NO'; // fallback (safe for evaluation)
-  }
+  if (!matches) return '0';
 
-  const num = parseInt(match[0], 10);
+  const numbers = matches.map(num => parseInt(num, 10));
 
-  // Detect intent
-  const isOddQuestion = text.includes('odd');
-  const isEvenQuestion = text.includes('even');
+  // Filter even numbers
+  const evenNumbers = numbers.filter(n => n % 2 === 0);
 
-  if (isOddQuestion) {
-    return num % 2 !== 0 ? 'YES' : 'NO';
-  }
+  // Sum them
+  const sum = evenNumbers.reduce((acc, val) => acc + val, 0);
 
-  if (isEvenQuestion) {
-    return num % 2 === 0 ? 'YES' : 'NO';
-  }
-
-  // fallback
-  return 'NO';
+  return String(sum);
 }
 
 /**
