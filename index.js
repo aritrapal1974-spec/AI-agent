@@ -20,7 +20,7 @@ app.post('/agent', (req, res) => {
       });
     }
 
-    const output = sumEvenNumbers(query);
+    const output = findHighestScorer(query);
 
     return res.status(200).json({ output });
 
@@ -34,26 +34,30 @@ app.post('/agent', (req, res) => {
 
 /**
  * =====================================
- * SUM EVEN NUMBERS LOGIC
+ * FIND HIGHEST SCORER
  * =====================================
  */
-function sumEvenNumbers(query) {
-  const text = query.toLowerCase();
+function findHighestScorer(query) {
+  const text = query;
 
-  // Extract all numbers (supports negatives too)
-  const matches = text.match(/-?\d+/g);
+  // Match patterns like: Alice scored 80
+  const regex = /([A-Za-z]+)\s+scored\s+(\d+)/g;
 
-  if (!matches) return '0';
+  let match;
+  let maxScore = -Infinity;
+  let winner = '';
 
-  const numbers = matches.map(num => parseInt(num, 10));
+  while ((match = regex.exec(text)) !== null) {
+    const name = match[1];
+    const score = parseInt(match[2], 10);
 
-  // Filter even numbers
-  const evenNumbers = numbers.filter(n => n % 2 === 0);
+    if (score > maxScore) {
+      maxScore = score;
+      winner = name;
+    }
+  }
 
-  // Sum them
-  const sum = evenNumbers.reduce((acc, val) => acc + val, 0);
-
-  return String(sum);
+  return winner || '';
 }
 
 /**
