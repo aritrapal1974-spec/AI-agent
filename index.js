@@ -24,28 +24,21 @@ app.post('/agent', (req, res) => {
 });
 
 function extractFirstValidTransaction(query) {
-  // 🔥 Extract log part
   const logMatch = query.match(/log\s*:\s*(.*)/i);
   if (!logMatch) return "";
 
   const log = logMatch[1];
 
-  // 🔥 Split safely on multiple separators
-  const entries = log.split(/\s*\|\s*|\s*-\s*|\s*,\s*/);
+  const regex = /([A-Za-z]+)\s+paid\s+\$(\d+)/g;
 
-  for (let entry of entries) {
-    entry = entry.trim();
+  let match;
 
-    // 🔥 Match "Name paid $Amount"
-    const match = entry.match(/^([A-Za-z]+)\s+paid\s+\$(\d+)/i);
-    if (!match) continue;
-
+  while ((match = regex.exec(log)) !== null) {
     const name = match[1];
     const amount = Number(match[2]);
 
-    // 🔥 Conditions
     if (name[0].toLowerCase() === 's' && amount > 100) {
-      return `${name} paid the amount of $${amount}.`;
+      return `${name} paid the amount of $${amount}.`.trim();
     }
   }
 
