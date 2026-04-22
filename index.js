@@ -1,10 +1,8 @@
 const express = require('express');
-const math = require('mathjs');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Middleware
 app.use(express.json());
 
 /**
@@ -18,198 +16,50 @@ app.post('/agent', (req, res) => {
 
     if (!query || typeof query !== 'string' || query.trim() === '') {
       return res.status(400).json({
-        output: 'Error: "query" is required and must be a non-empty string.'
+        output: 'Error: "query" must be a non-empty string.'
       });
     }
 
-    const output = calculateExpression(query);
+    const output = extractDate(query);
+
     return res.status(200).json({ output });
 
   } catch (error) {
     console.error(error);
     return res.status(500).json({
-      output: 'Internal server error: Unable to process your request.'
+      output: 'Internal server error.'
     });
   }
 });
 
 /**
  * =====================================
- * MAIN CALCULATOR FUNCTION
+ * DATE EXTRACTION LOGIC
  * =====================================
  */
-function calculateExpression(query) {
-  const normalized = query.toLowerCase().trim();
+function extractDate(query) {
+  const text = query;
 
-  const expression = convertNaturalLanguageToMath(normalized);
+  // 1. 12 March 2024 / 5 Jan 2023
+  const pattern1 = /\b(\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\b/i;
 
-  if (!expression) {
-    return 'I could not understand the query.';
+  // 2. March 12, 2024
+  const pattern2 = /\b((January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4})\b/i;
+
+  // 3. 2024-03-12
+  const pattern3 = /\b(\d{4}-\d{2}-\d{2})\b/;
+
+  // 4. 12/03/2024 or 12-03-2024
+  const pattern4 = /\b(\d{1,2}[\/-]\d{1,2}[\/-]\d{4})\b/;
+
+  const patterns = [pattern1, pattern2, pattern3, pattern4];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) return match[1];
   }
 
-  const result = safeEvaluate(expression);
-
-if (result.error) return result.error;
-
-// 🔥 detect operation from ORIGINAL query (not expression)
-const operation = detectOperationFromQuery(query);
-
-return formatResult(result.value, operation);
-
-  if (result.error) return result.error;
-
-  return formatResult(result.value, result.operation);
-}
-
-/**
- * =====================================
- * NLP → MATH CONVERSION
- * =====================================
- */
-function convertNaturalLanguageToMath(query) {
-  let cleaned = query
-    .replace(/\bwhat\s+is\b/g, '')
-    .replace(/\bcalculate\b/g, '')
-    .replace(/\bfind\b/g, '')
-    .replace(/\bplease\b/g, '')
-    .replace(/\bcompute\b/g, '')
-    .replace(/\bthe\b/g, '')
-    .replace(/\bof\b/g, '')
-    .replace(/\band\b/g, ' ')
-    .replace(/\?\s*$/, '')
-    .trim();
-
-  // Structured phrases
-  cleaned = cleaned
-    .replace(/product\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/gi, '$1 * $2')
-    .replace(/sum\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/gi, '$1 + $2')
-    .replace(/difference\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/gi, '$1 - $2')
-    .replace(/quotient\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/gi, '$1 / $2');
-
-  // Natural phrases
-  cleaned = cleaned
-    .replace(/add (\d+(?:\.\d+)?) (\d+(?:\.\d+)?)/gi, '$1 + $2')
-    .replace(/subtract (\d+(?:\.\d+)?) from (\d+(?:\.\d+)?)/gi, '$2 - $1')
-    .replace(/multiply (\d+(?:\.\d+)?) (by|with) (\d+(?:\.\d+)?)/gi, '$1 * $3')
-    .replace(/divide (\d+(?:\.\d+)?) by (\d+(?:\.\d+)?)/gi, '$1 / $2');
-
-  // Word operators
-  cleaned = cleaned
-    .replace(/\bplus\b/g, '+')
-    .replace(/\bminus\b/g, '-')
-    .replace(/\btimes\b/g, '*')
-    .replace(/\bmultiplied\b/g, '*')
-    .replace(/\bdivided\b/g, '/')
-    .replace(/\bmod\b/g, '%')
-    .replace(/\bpower\b/g, '^')
-    .replace(/\braised to\b/g, '^')
-    .replace(/\bsquared\b/g, '^2')
-    .replace(/\bcubed\b/g, '^3');
-
-  if (!/[\d.]+.*[+\-*/%^].*[\d.]+/.test(cleaned)) {
-    return null;
-  }
-
-  return cleaned;
-}
-
-/**
- * =====================================
- * SAFE EVALUATION (mathjs)
- * =====================================
- */
-function safeEvaluate(expression) {
-  try {
-    const value = math.evaluate(expression);
-
-    if (!isFinite(value)) {
-      return {
-        error: 'Cannot divide by zero.',
-        value: null,
-        operation: null
-      };
-    }
-
-    return {
-      value,
-      operation: detectOperation(expression),
-      error: null
-    };
-
-  } catch {
-    return {
-      error: 'Invalid expression.',
-      value: null,
-      operation: null
-    };
-  }
-}
-
-/**
- * =====================================
- * DETECT OPERATION TYPE
- * =====================================
- */
-function detectOperation(expr) {
-  if (expr.includes('+')) return 'sum';
-  if (expr.includes('-')) return 'difference';
-  if (expr.includes('*')) return 'product';
-  if (expr.includes('/')) return 'quotient';
-  if (expr.includes('%')) return 'remainder';
-  if (expr.includes('^')) return 'power';
-  return 'result';
-}
-function detectOperationFromQuery(query) {
-  const q = query.toLowerCase();
-
-  if (q.includes('add') || q.includes('plus') || q.includes('+') || q.includes('sum')) {
-    return 'sum';
-  }
-  if (q.includes('subtract') || q.includes('minus') || q.includes('-') || q.includes('difference')) {
-    return 'difference';
-  }
-  if (q.includes('multiply') || q.includes('times') || q.includes('*') || q.includes('product')) {
-    return 'product';
-  }
-  if (q.includes('divide') || q.includes('divided') || q.includes('/') || q.includes('quotient')) {
-    return 'quotient';
-  }
-  if (q.includes('%') || q.includes('mod')) {
-    return 'remainder';
-  }
-  if (q.includes('power') || q.includes('^')) {
-    return 'power';
-  }
-
-  return 'result';
-}
-
-/**
- * =====================================
- * FORMAT OUTPUT
- * =====================================
- */
-function formatResult(value, operation) {
-  const formatted = Number.isInteger(value)
-    ? value
-    : parseFloat(value.toFixed(2));
-
-  switch (operation) {
-    case 'sum':
-      return `The sum is ${formatted}.`;
-    case 'difference':
-      return `The difference is ${formatted}.`;
-    case 'product':
-      return `The product is ${formatted}.`;
-    case 'quotient':
-      return `The quotient is ${formatted}.`;
-    case 'remainder':
-      return `The remainder is ${formatted}.`;
-    case 'power':
-      return `The result of exponentiation is ${formatted}.`;
-    default:
-      return `The result is ${formatted}.`;
-  }
+  return 'No valid date found.';
 }
 
 /**
