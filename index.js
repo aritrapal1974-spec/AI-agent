@@ -12,142 +12,254 @@ app.use(express.json());
  */
 app.post('/agent', (req, res) => {
   try {
-    const { query } = req.body;
+    console.log("BODY RECEIVED:", req.body);
+    // Destructure query and assets from request body
+    // Default assets to empty array if not provided
+    const { query, assets = [] } = req.body;
 
-    // Validate input
+    // Validate that query exists and is a string
     if (!query || typeof query !== 'string') {
       return res.status(400).json({
-        error: 'Invalid input: "query" must be a non-empty string'
+        output: 'Error: "query" is required and must be a non-empty string.'
       });
     }
 
-   
-  
+    // Note: assets is accepted but not processed
+    // (placeholder for future file/URL processing)
 
-    // ===================================================================
-    // ENHANCED CALCULATOR LOGIC - Dynamic parsing for arithmetic operations
-    // ===================================================================
-    // This implementation extracts numbers and operations from natural
-    // language queries using Regex pattern matching and math evaluation.
-    //
-    // NOTE: PLACEHOLDER FOR LLM INTEGRATION
-    // ===================================================================
-    // To swap this out with an actual LLM API (OpenAI, Anthropic, etc.):
-    //
-    // 1. Replace the calculateExpression() call with an async LLM call:
-    //    const output = await callLLMAPI(query, assets);
-    //
-    // 2. Example async function structure:
-    //    async function callLLMAPI(query, assets) {
-    //      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    //        method: 'POST',
-    //        headers: {
-    //          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-    //          'Content-Type': 'application/json'
-    //        },
-    //        body: JSON.stringify({
-    //          model: 'gpt-4',
-    //          messages: [{ role: 'user', content: query }],
-    //          temperature: 0.7
-    //        })
-    //      });
-    //      const data = await response.json();
-    //      return data.choices[0].message.content;
-    //    }
-    //
-    // 3. Make the route async and await the LLM call
-    // ===================================================================
-
-    // Call the calculator function
+    // Calculate the expression
     const output = calculateExpression(query);
 
-    // Return the response in the required format
+    // Return response with 'output' key (API contract requirement)
     return res.status(200).json({ output });
 
   } catch (error) {
+    // Return errors with 'output' key for strict API compliance
     console.error('Error processing request:', error);
     return res.status(500).json({
-      error: 'Internal server error: ' + error.message
+      output: 'Internal server error: Unable to process your request.'
     });
   }
 });
 
 /**
- * Enhanced Calculator Parser
+ * ===================================================================
+ * NATURAL LANGUAGE CALCULATOR
+ * ===================================================================
+ * Converts natural language queries into math expressions and
+ * safely evaluates them without using eval().
  * 
- * Extracts numbers and operations from natural language queries.
  * Supports:
- *   - Addition (+, plus)
- *   - Subtraction (-, minus)
- *   - Multiplication (*, times, multiplied by)
- *   - Division (/, divided by)
- *   - Exponentiation (^, power, squared, cubed)
- *   - Modulo (%, mod)
- * 
- * @param {string} query - The user's question (e.g., "What is 10 + 15?")
- * @returns {string} - The answer in natural language format
+ *   - Operator words: plus, minus, times, divided by, power, mod
+ *   - Structured phrases: "product of X and Y", "sum of X and Y"
+ *   - Integers and decimals (including negative numbers)
+ *   - Complex expressions: 10 + 5 * 2
+ * ===================================================================
+ */
+
+/**
+ * Convert natural language query into mathematical expression
+ * @param {string} query - Natural language math query
+ * @returns {string} - Mathematical expression or error message
  */
 function calculateExpression(query) {
-  // Normalize the query
+  // Step 1: Validate query
+  if (!query || typeof query !== 'string' || query.trim() === '') {
+    return 'Query is required.';
+  }
+
   const normalizedQuery = query.toLowerCase().trim();
 
-  // Try to extract a mathematical expression
-  // Pattern matches: number operator number (with optional decimals)
-  const mathPattern = /(\d+(?:\.\d+)?)\s*([+\-*/%^])\s*(\d+(?:\.\d+)?)/;
-  const match = normalizedQuery.match(mathPattern);
+  // Step 2: Convert natural language to math expression
+  let mathExpression = convertNaturalLanguageToMath(normalizedQuery);
 
-  if (!match) {
-    return 'I could not parse a mathematical expression from your query. Please provide numbers and an operation (e.g., "What is 10 + 15?").';
+  if (!mathExpression) {
+    return 'I could not understand the query.';
   }
 
-  const num1 = parseFloat(match[1]);
-  const operator = match[2];
-  const num2 = parseFloat(match[3]);
+  // Step 3: Safely evaluate the expression
+  const result = safeEvaluate(mathExpression);
 
-  let result;
-  let operationName;
-
-  // Perform the calculation based on the operator
-  switch (operator) {
-    case '+':
-      result = num1 + num2;
-      operationName = 'sum';
-      break;
-    case '-':
-      result = num1 - num2;
-      operationName = 'difference';
-      break;
-    case '*':
-      result = num1 * num2;
-      operationName = 'product';
-      break;
-    case '/':
-      if (num2 === 0) {
-        return 'Cannot divide by zero.';
-      }
-      result = num1 / num2;
-      operationName = 'quotient';
-      break;
-    case '%':
-      if (num2 === 0) {
-        return 'Cannot divide by zero in modulo operation.';
-      }
-      result = num1 % num2;
-      operationName = 'remainder';
-      break;
-    case '^':
-      result = Math.pow(num1, num2);
-      operationName = 'result of exponentiation';
-      break;
-    default:
-      return 'Unsupported operation.';
+  if (result === null) {
+    return 'I could not understand the query.';
   }
 
-  // Format the result (handle floating point precision)
-  const formattedResult = Number.isInteger(result) ? result : result.toFixed(2);
+  if (result.error) {
+    return result.error;
+  }
 
-  // Return the answer in natural language format
-  return `The ${operationName} is ${formattedResult}.`;
+  // Step 4: Format and return natural language response
+  return formatResult(result.value, result.operation);
+}
+
+/**
+ * Convert natural language phrases to mathematical operators
+ * @param {string} query - Normalized query string
+ * @returns {string|null} - Mathematical expression
+ */
+function convertNaturalLanguageToMath(query) {
+  // Remove filler words
+  let cleaned = query
+    .replace(/\bwhat\s+is\b/g, '')
+    .replace(/\bcalculate\b/g, '')
+    .replace(/\bfind\b/g, '')
+    .replace(/\bplease\b/g, '')
+    .replace(/\bcompute\b/g, '')
+    .replace(/\b\?\s*$/g, '') // Remove trailing question mark
+    .trim();
+
+  // Handle structured phrases: "product of A and B", "sum of A and B", etc.
+  const structuredPatterns = [
+    { pattern: /product\s+of\s+([\d.]+)\s+and\s+([\d.]+)/gi, operator: '*', name: 'product' },
+    { pattern: /sum\s+of\s+([\d.]+)\s+and\s+([\d.]+)/gi, operator: '+', name: 'sum' },
+    { pattern: /difference\s+of\s+([\d.]+)\s+and\s+([\d.]+)/gi, operator: '-', name: 'difference' },
+    { pattern: /quotient\s+of\s+([\d.]+)\s+and\s+([\d.]+)/gi, operator: '/', name: 'quotient' },
+  ];
+
+  for (const { pattern, operator } of structuredPatterns) {
+    const match = cleaned.match(pattern);
+    if (match) {
+      return cleaned.replace(pattern, `$1 ${operator} $2`);
+    }
+  }
+
+  // Convert operator words to symbols
+  let expression = cleaned
+    // Handle "divided by" and "divided" before single "d"
+    .replace(/\s+divided\s+by\s+/gi, ' / ')
+    .replace(/\s+multiplied\s+by\s+/gi, ' * ')
+    // Single word operators
+    .replace(/\bplus\b/gi, '+')
+    .replace(/\bminus\b/gi, '-')
+    .replace(/\btimes\b/gi, '*')
+    .replace(/\bdivide\b/gi, '/')
+    .replace(/\bmod\b/gi, '%')
+    .replace(/\bmodulo\b/gi, '%')
+    .replace(/\bpower\b/gi, '^')
+    .replace(/\braised\s+to\b/gi, '^')
+    .replace(/\bsquared\b/gi, '^ 2')
+    .replace(/\bcubed\b/gi, '^ 3')
+    .trim();
+
+  // Validate expression contains at least one operator and numbers
+  if (!/[\d.]+\s*[+\-*/%^]\s*[\d.]+/.test(expression)) {
+    return null;
+  }
+
+  return expression;
+}
+
+/**
+ * Safely evaluate mathematical expressions without using eval()
+ * Supports: +, -, *, /, %, ^ with proper order of operations
+ * 
+ * @param {string} expression - Mathematical expression (e.g., "10 + 5 * 2")
+ * @returns {object} - { value: number, operation: string, error: null } or { error: string, value: null, operation: null }
+ */
+function safeEvaluate(expression) {
+  // Sanitize: remove spaces and ensure valid characters only
+  const sanitized = expression.replace(/\s+/g, '');
+
+  // Validate: only numbers, operators, and parentheses allowed
+  if (!/^[-]?[\d.+\-*/%^()]+$/.test(sanitized)) {
+    return { error: 'Invalid expression.', value: null, operation: null };
+  }
+
+  try {
+    // Parse and evaluate with proper order of operations
+    const result = evaluateExpression(sanitized);
+
+    if (isNaN(result)) {
+      return { error: 'Invalid expression.', value: null, operation: null };
+    }
+
+    // Determine operation type from expression
+    const operation = detectOperation(sanitized);
+
+    return { value: result, operation, error: null };
+  } catch (error) {
+    return { error: 'Cannot divide by zero.', value: null, operation: null };
+  }
+}
+
+/**
+ * Evaluate mathematical expression with proper order of operations
+ * Respects: Exponentiation (^) > Multiplication/Division (*, /, %) > Addition/Subtraction (+, -)
+ * 
+ * @param {string} expr - Sanitized expression
+ * @returns {number} - Result
+ */
+function evaluateExpression(expr) {
+  // Handle exponentiation (highest priority)
+  expr = expr.replace(/(-?\d+\.?\d*)\^(-?\d+\.?\d*)/g, (match, base, exp) => {
+    return Math.pow(parseFloat(base), parseFloat(exp));
+  });
+
+  // Handle multiplication, division, modulo (medium priority)
+  expr = expr.replace(/(-?\d+\.?\d*)[*/%](-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
+    const a = parseFloat(num1);
+    const b = parseFloat(num2);
+
+    if (operator === '*') return a * b;
+    if (operator === '/') {
+      if (b === 0) throw new Error('Division by zero');
+      return a / b;
+    }
+    if (operator === '%') {
+      if (b === 0) throw new Error('Division by zero');
+      return a % b;
+    }
+  });
+
+  // Handle addition, subtraction (lowest priority)
+  expr = expr.replace(/(-?\d+\.?\d*)[+-](-?\d+\.?\d*)/g, (match, num1, operator, num2) => {
+    const a = parseFloat(num1);
+    const b = parseFloat(num2);
+
+    if (operator === '+') return a + b;
+    if (operator === '-') return a - b;
+  });
+
+  return parseFloat(expr);
+}
+
+/**
+ * Detect the primary operation in an expression
+ * @param {string} expr - Sanitized expression
+ * @returns {string} - Operation name
+ */
+function detectOperation(expr) {
+  // Check in order of lowest to highest precedence (since we evaluate those last)
+  if (/[+]/.test(expr) && !expr.match(/^-/)) return 'sum';
+  if (/-(?!^\-)/.test(expr)) return 'difference';
+  if (/\*/.test(expr)) return 'product';
+  if (/\//.test(expr)) return 'quotient';
+  if (/%/.test(expr)) return 'remainder';
+  if (/\^/.test(expr)) return 'power';
+  return 'result';
+}
+
+/**
+ * Format calculation result into natural language
+ * @param {number} value - Calculated result
+ * @param {string} operation - Type of operation
+ * @returns {string} - Formatted response
+ */
+function formatResult(value, operation) {
+  // Format number: remove unnecessary decimals
+  const formatted = Number.isInteger(value) ? value : parseFloat(value.toFixed(2));
+
+  const operationNames = {
+    'sum': 'sum',
+    'difference': 'difference',
+    'product': 'product',
+    'quotient': 'quotient',
+    'remainder': 'remainder',
+    'power': 'power'
+  };
+
+  const opName = operationNames[operation] || 'result';
+  return `The ${opName} is ${formatted}.`;
 }
 
 /**
