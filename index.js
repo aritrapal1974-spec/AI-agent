@@ -12,73 +12,55 @@ app.use(express.json());
  */
 app.post('/agent', (req, res) => {
   try {
-    const { query, assets = [] } = req.body;
+    const { query } = req.body;
 
     if (!query || typeof query !== 'string') {
-      return res.json({ output: '0' });
+      return res.json({ output: "0" });
     }
 
-    const output = solveMath(query);
+    const output = applyRules(query);
 
-    return res.json({ output: output });
+    return res.json({ output });
 
   } catch (error) {
     console.error(error);
-    return res.json({ output: '0' });
+    return res.json({ output: "0" });
   }
 });
 
 /**
  * =====================================
- * FINAL ROBUST SOLVER
+ * RULE ENGINE
  * =====================================
  */
-function solveMath(query) {
-  let text = query.toLowerCase();
+function applyRules(query) {
+  // 🔥 extract number safely
+  const match = query.match(/-?\d+/);
+  if (!match) return "0";
 
-  // 🔥 1. Force extract from "actual task"
-  const taskMatch = text.match(/actual task[:\-]?\s*(.*)/);
-  if (taskMatch) {
-    text = taskMatch[1];
+  let num = parseInt(match[0], 10);
+
+  // 🔥 Rule 1
+  if (num % 2 === 0) {
+    num = num * 2;
+  } else {
+    num = num + 10;
   }
 
-  // 🔥 2. Remove all non-math characters
-  text = text.replace(/[^0-9+\-*/ ]/g, ' ');
-
-  // 🔥 3. Normalize spaces
-  text = text.replace(/\s+/g, ' ').trim();
-
-  // 🔥 4. Extract expression safely
-  const match = text.match(/^(\d+)\s*([\+\-\*\/])\s*(\d+)$/)
-              || text.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
-
-  if (!match) return "20"; // ⚠️ fallback (important for cosine)
-
-  const a = Number(match[1]);
-  const op = match[2];
-  const b = Number(match[3]);
-
-  let result;
-
-  switch (op) {
-    case '+': result = a + b; break;
-    case '-': result = a - b; break;
-    case '*': result = a * b; break;
-    case '/': result = b !== 0 ? Math.floor(a / b) : 0; break;
-    default: return  "20" ;
+  // 🔥 Rule 2
+  if (num > 20) {
+    num = num - 5;
+  } else {
+    num = num + 3;
   }
 
-  return String(result).trim();
+  // 🔥 Rule 3
+  if (num % 3 === 0) {
+    return "FIZZ";
+  }
+
+  return String(num);
 }
-
-/**
- * =====================================
- * HEALTH CHECK
- * =====================================
- */
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
 
 /**
  * =====================================
