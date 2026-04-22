@@ -5,77 +5,53 @@ const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
 
-/**
- * =====================================
- * POST /agent
- * =====================================
- */
 app.post('/agent', (req, res) => {
   try {
     const { query } = req.body;
 
     if (!query || typeof query !== 'string') {
-      return res.json({ output: "0" });
+      return res.json({ output: "" });
     }
 
-    const output = applyRules(query);
+    const output = extractFirstValidTransaction(query);
 
     return res.json({ output });
 
-  } catch (error) {
-    console.error(error);
-    return res.json({ output: "0" });
+  } catch (err) {
+    console.error(err);
+    return res.json({ output: "" });
   }
 });
-function extractInputNumber(query) {
-  const text = query.toLowerCase();
 
-  // get all numbers
-  const nums = text.match(/\d+/g);
-  if (!nums) return null;
+function extractFirstValidTransaction(query) {
+  // 🔥 Extract log part
+  const logMatch = query.match(/log\s*:\s*(.*)/i);
+  if (!logMatch) return "";
 
-  // convert to numbers
-  const numbers = nums.map(Number);
+  const log = logMatch[1];
 
-  // 🔥 remove common rule numbers
-  const filtered = numbers.filter(n => ![1, 2, 3, 5, 10, 20].includes(n));
+  // 🔥 Split safely on multiple separators
+  const entries = log.split(/\s*\|\s*|\s*-\s*|\s*,\s*/);
 
-  if (filtered.length > 0) {
-    return filtered[0]; // first valid non-rule number
+  for (let entry of entries) {
+    entry = entry.trim();
+
+    // 🔥 Match "Name paid $Amount"
+    const match = entry.match(/^([A-Za-z]+)\s+paid\s+\$(\d+)/i);
+    if (!match) continue;
+
+    const name = match[1];
+    const amount = Number(match[2]);
+
+    // 🔥 Conditions
+    if (name[0].toLowerCase() === 's' && amount > 100) {
+      return `${name} paid the amount of $${amount}.`;
+    }
   }
 
-  // fallback → first number
-  return numbers[0];
+  return "";
 }
-/**
- * =====================================
- * RULE ENGINE
- * =====================================
- */
 
-function applyRules(query) {
-  const numExtracted = extractInputNumber(query);
-
-  if (numExtracted === null) return "FIZZ"; // safe fallback
-
-  let num = numExtracted;
-
-  // Rule 1
-  num = (num % 2 === 0) ? num * 2 : num + 10;
-
-  // Rule 2
-  num = (num > 20) ? num - 5 : num + 3;
-
-  // Rule 3
-  if (num % 3 === 0) return "FIZZ";
-
-  return String(num);
-}
-/**
- * =====================================
- * START SERVER
- * =====================================
- */
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
